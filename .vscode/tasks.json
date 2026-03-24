@@ -1,0 +1,278 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "go: build",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "build",
+        "-v",
+        "-o",
+        "${workspaceFolder}/bin/shorturl",
+        "${workspaceFolder}/cmd/shorturl"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "go: run",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "run",
+        "${workspaceFolder}/cmd/shorturl/main.go"
+      ],
+      "group": "none",
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "go: test all",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "test",
+        "-v",
+        "./..."
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "go: test with coverage",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "test",
+        "-v",
+        "-cover",
+        "-coverprofile=coverage.out",
+        "./..."
+      ],
+      "group": "test",
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "go: test integration",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "test",
+        "-v",
+        "./test/integration/..."
+      ],
+      "group": "test",
+      "dependsOn": [
+        "docker: start redis"
+      ],
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "go: mod download",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "mod",
+        "download"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "go: mod tidy",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "mod",
+        "tidy"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "go: fmt",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "fmt",
+        "./..."
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "go: vet",
+      "type": "shell",
+      "command": "go",
+      "args": [
+        "vet",
+        "./..."
+      ],
+      "group": "none",
+      "problemMatcher": [
+        "$go"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "docker: start redis",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "run",
+        "-d",
+        "--name",
+        "short-url-redis-test",
+        "-p",
+        "6379:6379",
+        "redis:7-alpine"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "docker: stop redis",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "stop",
+        "short-url-redis-test",
+        "&&",
+        "docker",
+        "rm",
+        "short-url-redis-test"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "docker-compose: up",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": [
+        "-f",
+        "${workspaceFolder}/deploy/docker-compose.yml",
+        "up",
+        "-d"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "docker-compose: down",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": [
+        "-f",
+        "${workspaceFolder}/deploy/docker-compose.yml",
+        "down"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "docker-compose: logs",
+      "type": "shell",
+      "command": "docker-compose",
+      "args": [
+        "-f",
+        "${workspaceFolder}/deploy/docker-compose.yml",
+        "logs",
+        "-f"
+      ],
+      "group": "none",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "docker: build",
+      "type": "shell",
+      "command": "docker",
+      "args": [
+        "build",
+        "-t",
+        "short-url-service:latest",
+        "-f",
+        "${workspaceFolder}/deploy/Dockerfile",
+        "${workspaceFolder}"
+      ],
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

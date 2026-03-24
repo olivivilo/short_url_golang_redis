@@ -1,0 +1,79 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Server",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/cmd/shorturl",
+      "env": {
+        "SERVER_PORT": "8080",
+        "REDIS_ADDR": "localhost:6379",
+        "REDIS_DB": "0",
+        "BASE_URL": "http://localhost:8080",
+        "LOG_LEVEL": "debug",
+        "MIN_CODE_LENGTH": "6"
+      },
+      "args": [],
+      "showLog": true,
+      "console": "integratedTerminal",
+      "preLaunchTask": "go: build"
+    },
+    {
+      "name": "Debug Current Test",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${file}",
+      "env": {
+        "TEST_REDIS_ADDR": "localhost:6379"
+      },
+      "args": [
+        "-test.v"
+      ],
+      "showLog": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug All Tests",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}",
+      "env": {
+        "TEST_REDIS_ADDR": "localhost:6379"
+      },
+      "args": [
+        "-test.v",
+        "./..."
+      ],
+      "showLog": true,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Debug Integration Tests",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "${workspaceFolder}/test/integration",
+      "env": {
+        "TEST_REDIS_ADDR": "localhost:6379"
+      },
+      "args": [
+        "-test.v"
+      ],
+      "showLog": true,
+      "console": "integratedTerminal",
+      "preLaunchTask": "docker: start redis"
+    },
+    {
+      "name": "Attach to Process",
+      "type": "go",
+      "request": "attach",
+      "mode": "local",
+      "processId": "${command:pickProcess}",
+      "showLog": true
+    }
+  ]
+}

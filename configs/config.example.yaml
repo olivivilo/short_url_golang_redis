@@ -1,0 +1,20 @@
+# Example configuration file for Short URL Service
+# Copy this file to config.yaml and adjust values as needed
+# Note: Environment variables take precedence over this file
+
+server:
+  port: 8080
+  shutdown_timeout: 30  # seconds
+
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+  pool_size: 50
+
+app:
+  base_url: http://localhost:8080
+  log_level: info  # debug, info, warn, error
+  min_code_length: 6
+  default_ttl: 0  # seconds, 0 = no expiry
+  max_url_length: 2048
