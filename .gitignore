@@ -49,7 +49,3 @@ temp/
 
 # Docker volumes
 data/
-
-# Build artifacts
-short-url
-shorturl
