@@ -3,7 +3,6 @@ package id
 import (
 	"context"
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/redis/go-redis/v9"
@@ -106,7 +105,7 @@ func DecodeBase62(code string) (int64, error) {
 		if j < 0 {
 			return 0, fmt.Errorf("cannot decode string due to illegal char: %c", code[i])
 		}
-		result += result*62 + int64(j)
+		result = result*62 + int64(j)
 	}
 
 	return result, nil
@@ -156,5 +155,14 @@ func ValidateCode(code string) error {
 // MaxIDForLength calculates the maximum ID that can be represented with the given code length.
 // This is useful for capacity planning.
 func MaxIDForLength(length int) int64 {
-	return int64(math.Pow(base, float64(length))) - 1
+	if length <= 0 {
+		return 0
+	}
+
+	var result int64 = 1
+	for i := 0; i < length; i++ {
+		result *= 62
+	}
+	return result - 1
+
 }
