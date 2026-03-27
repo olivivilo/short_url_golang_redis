@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -22,7 +23,7 @@ func NewURLRepository(client *redis.Client) *URLRepository {
 }
 
 // Save saves a URL to Redis.
-// TODO: Implement the save operation:
+// DONE: Implement the save operation:
 // 1. Create the Redis key: "url:{code}"
 // 2. Use HSET to store all URL fields in a hash
 // 3. Set TTL if expire_at is specified
@@ -30,20 +31,61 @@ func NewURLRepository(client *redis.Client) *URLRepository {
 // 5. Set TTL on visit counter to match URL TTL
 // 6. Use pipeline or transaction for atomicity
 func (r *URLRepository) Save(ctx context.Context, url *model.URL) error {
-	// TODO: Implement save logic
+	// DONE: Implement save logic
 	// key := fmt.Sprintf("url:%s", url.Code)
 	// visitsKey := fmt.Sprintf("url:%s:visits", url.Code)
 
-	// TODO: Use Redis pipeline for atomic operations
+	key := fmt.Sprintf("url:%s", url.Code)
+
+	visitsKey := fmt.Sprintf("url:%s:visits", url.Code)
+
+	values := map[string]any{
+		"code":         url.Code,
+		"short_url":    url.ShortURL,
+		"original_url": url.OriginalURL,
+		"created_at":   url.CreatedAt.Format(time.RFC3339Nano),
+		"note":         url.Note,
+	}
+
+	if url.ExpireAt != nil {
+		values["expire_at"] = url.ExpireAt.Format(time.RFC3339Nano)
+	}
+
+	if url.DeletedAt != nil {
+		values["deleted_at"] = url.DeletedAt.Format(time.RFC3339Nano)
+	}
+
+	_, err := r.client.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+		pipe.HSet(ctx, key, values)
+		pipe.Set(ctx, visitsKey, 0, 0)
+
+		if url.ExpireAt != nil {
+			ttl := time.Until(*url.ExpireAt)
+			if ttl > 0 {
+				pipe.Expire(ctx, key, ttl)
+				pipe.Expire(ctx, visitsKey, ttl)
+			} else {
+				pipe.Del(ctx, key, visitsKey)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("Save not implemented due to: %v", err)
+	}
+
+	// DONE: Use Redis pipeline for atomic operations
 	// pipe := r.client.Pipeline()
 	// ... pipeline operations ...
 	// _, err := pipe.Exec(ctx)
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 // Get retrieves a URL by its code.
-// TODO: Implement the get operation:
+// DONE: Implement the get operation:
 // 1. Create the Redis key: "url:{code}"
 // 2. Use HGETALL to retrieve all fields
 // 3. Check if key exists (empty map means not found)
@@ -51,25 +93,77 @@ func (r *URLRepository) Save(ctx context.Context, url *model.URL) error {
 // 5. Get visit count from "url:{code}:visits"
 // 6. Construct and return the URL model
 func (r *URLRepository) Get(ctx context.Context, code string) (*model.URL, error) {
-	// TODO: Implement get logic
+	// DONE: Implement get logic
 	// key := fmt.Sprintf("url:%s", code)
 	// visitsKey := fmt.Sprintf("url:%s:visits", code)
+	key := fmt.Sprintf("url:%s", code)
+	visitsKey := fmt.Sprintf("url:%s:visits", code)
 
-	// TODO: Use HGETALL to get all fields
+	// DONE: Use HGETALL to get all fields
 	// fields, err := r.client.HGetAll(ctx, key).Result()
 	// if err != nil {
 	//     return nil, fmt.Errorf("failed to get URL: %w", err)
 	// }
+	fields, err := r.client.HGetAll(ctx, key).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get URL hash for %q: %w", code, err)
+	}
 
-	// TODO: Check if URL exists
+	// DONE: Check if URL exists
 	// if len(fields) == 0 {
 	//     return nil, ErrURLNotFound
 	// }
+	if len(fields) == 0 {
+		return nil, ErrURLNotFound
+	}
 
-	// TODO: Parse fields and construct URL model
-	// TODO: Get visit count
+	// DONE: Parse fields and construct URL model
+	// DONE: Get visit count
+	url := model.URL{
+		Code:        fields["code"],
+		ShortURL:    fields["short_url"],
+		OriginalURL: fields["original_url"],
+		Note:        fields["note"],
+	}
 
-	return nil, fmt.Errorf("not implemented")
+	createdAt, err := time.Parse(time.RFC3339Nano, fields["created_at"])
+	if err != nil {
+		return nil, fmt.Errorf("invalid created_at %q: %w", fields["created_at"], err)
+	}
+	url.CreatedAt = createdAt
+
+	if s, ok := fields["expire_at"]; ok && s != "" {
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid expire_at %q: %w", s, err)
+		}
+		url.ExpireAt = &t
+	}
+
+	if s, ok := fields["deleted_at"]; ok && s != "" {
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid deleted_at %q: %w", s, err)
+		}
+		url.DeletedAt = &t
+	}
+
+	visits, err := r.client.Get(ctx, visitsKey).Result()
+	if err != nil {
+		if err == redis.Nil {
+			url.VisitCount = 0
+		} else {
+			return nil, fmt.Errorf("failed to get visits for %q: %w", code, err)
+		}
+	} else {
+		n, err := strconv.ParseInt(visits, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid visits value %q: %w", visits, err)
+		}
+		url.VisitCount = n
+	}
+
+	return &url, nil
 }
 
 // Delete soft-deletes a URL by setting the deleted_at timestamp.

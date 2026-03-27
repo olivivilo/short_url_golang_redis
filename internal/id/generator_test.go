@@ -1,7 +1,9 @@
 package id
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -77,7 +79,6 @@ func TestDecodeBase62(t *testing.T) {
 		if out != tt.want {
 			t.Errorf("DecodeBase62(%q) = %d; want %d", tt.in, out, tt.want)
 		}
-
 	}
 }
 
@@ -177,10 +178,6 @@ func TestMaxIDForLength(t *testing.T) {
 }
 
 func newTestRedis(t *testing.T) *redis.Client {
-	return nil
-}
-
-func TestNewGenerator(t *testing.T) {
 	t.Helper()
 
 	addr := "localhost:6379"
@@ -189,17 +186,88 @@ func TestNewGenerator(t *testing.T) {
 		Addr: addr,
 		DB:   15,
 	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		t.Fatalf("redis ping failed: %v", err)
+	}
+
+	if err := client.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("redis flush before test failed: %v", err)
+	}
+
+	t.Cleanup(func() {
+		clean_ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := client.FlushDB(clean_ctx).Err(); err != nil {
+			t.Logf("redis flush after test failed: %v", err)
+		}
+
+		if err := client.Close(); err != nil {
+			t.Logf("redis close failed: %v", err)
+		}
+	})
+
+	return client
 }
 
 // TestGeneratorIntegration tests the full generator with a real Redis instance.
 // This test requires a running Redis instance.
-// TODO: Implement integration test:
+// DONE: Implement integration test:
 // 1. Set up test Redis client
 // 2. Generate multiple codes
 // 3. Verify uniqueness
 // 4. Verify minimum length
 // 5. Clean up test data
 func TestGeneratorIntegration(t *testing.T) {
-	// TODO: Implement integration test
-	t.Skip("TODO: Implement generator integration tests")
+	// DONE: Implement integration test
+	// t.Skip("TODO: Implement generator integration tests")
+
+	redis_client := newTestRedis(t)
+	g := NewGenerator(redis_client, 6)
+
+	tests := []struct {
+		starting_url_id int64
+		want, wantErr   string
+	}{
+		{-1, "000001", ""},
+		{-1, "000002", ""},
+		{-1, "000003", ""},
+		{12152, "0003A1", ""},
+		{-1, "0003A2", ""},
+		{931151402, "111111", ""},
+		{221919451578090, "111111111", ""},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	for _, tt := range tests {
+		if tt.starting_url_id >= 0 {
+			if err := g.redis.Set(ctx, "global:url_id", tt.starting_url_id, 0).Err(); err != nil {
+				t.Fatalf("cannot set global:url_id to %d: %v", tt.starting_url_id, err)
+			}
+
+			out, err := g.Generate(ctx)
+
+			if err == nil {
+				if tt.wantErr != "" {
+					t.Errorf("expect error from Generate(): %q; got nil", tt.wantErr)
+					continue
+				}
+			} else {
+				if tt.wantErr != err.Error() {
+					t.Errorf("expect error from Generate(): %q; got %v", tt.wantErr, err)
+					continue
+				}
+			}
+
+			if tt.want != out {
+				t.Errorf("Generate() = %q; want %q", out, tt.want)
+			}
+		}
+	}
 }
