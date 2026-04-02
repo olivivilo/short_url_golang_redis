@@ -167,16 +167,33 @@ func (r *URLRepository) Get(ctx context.Context, code string) (*model.URL, error
 }
 
 // Delete soft-deletes a URL by setting the deleted_at timestamp.
-// TODO: Implement the delete operation:
+// DONE: Implement the delete operation:
 // 1. Check if URL exists
 // 2. Set "deleted_at" field in the hash
 // 3. Optionally adjust TTL to expire soon (e.g., 7 days)
 // 4. Return error if URL doesn't exist
 func (r *URLRepository) Delete(ctx context.Context, code string) error {
-	// TODO: Implement delete logic
-	// key := fmt.Sprintf("url:%s", code)
+	var deleteURLScript = redis.NewScript(`
+		local key = KEYS[1]
+		local now = ARGV[1]
 
-	// TODO: Check existence
+		if redis.call("EXISTS", key) == 0 then
+			return 0
+		end
+
+		if redis.call("HEXISTS", key, "deleted_at") == 0 then
+			redis.call("HSET", key, "deleted_at", now)
+			return 1
+		end
+
+		return -1
+	`)
+
+	// DONE: Implement delete logic
+	// key := fmt.Sprintf("url:%s", code)
+	key := fmt.Sprintf("url:%s", code)
+
+	// DONE: Check existence
 	// exists, err := r.client.Exists(ctx, key).Result()
 	// if err != nil {
 	//     return fmt.Errorf("failed to check URL existence: %w", err)
@@ -185,78 +202,84 @@ func (r *URLRepository) Delete(ctx context.Context, code string) error {
 	//     return ErrURLNotFound
 	// }
 
-	// TODO: Set deleted_at timestamp
+	// DONE: Set deleted_at timestamp
 	// now := time.Now().Format(time.RFC3339)
 	// err = r.client.HSet(ctx, key, "deleted_at", now).Err()
+	now := time.Now().Format(time.RFC3339Nano)
 
-	return fmt.Errorf("not implemented")
+	res, err := deleteURLScript.Run(ctx, r.client, []string{key}, now).Int()
+	if err != nil {
+		return fmt.Errorf("failed to delete URL %q: %w", code, err)
+	}
+	switch res {
+	case 0:
+		return ErrURLNotFound
+	case 1:
+		return nil
+	case -1:
+		return nil
+	}
+
+	return fmt.Errorf("unknown return value from lua script: %d", res)
 }
 
 // IncrementVisits increments the visit counter for a URL.
-// TODO: Implement the increment operation:
+// DONE: Implement the increment operation:
 // 1. Use INCR on "url:{code}:visits"
 // 2. Return the new count
 // 3. Handle the case where the key doesn't exist
 func (r *URLRepository) IncrementVisits(ctx context.Context, code string) (int64, error) {
-	// TODO: Implement increment logic
+	// DONE: Implement increment logic
 	// visitsKey := fmt.Sprintf("url:%s:visits", code)
 	// count, err := r.client.Incr(ctx, visitsKey).Result()
 	// if err != nil {
 	//     return 0, fmt.Errorf("failed to increment visits: %w", err)
 	// }
+	var incrementScript = redis.NewScript(`
+		local key = KEYS[1]
+		
+		if redis.call("EXISTS", key) == 0 then
+			return -1
+		end
 
-	return 0, fmt.Errorf("not implemented")
+		return redis.call("INCR", key)
+	`)
+
+	visitsKey := fmt.Sprintf("url:%s:visits", code)
+
+	res, err := incrementScript.Run(ctx, r.client, []string{visitsKey}).Int64()
+	if err != nil {
+		return 0, fmt.Errorf("failed to implement IncrementVisits() due to: %w", err)
+	}
+	if res < 0 {
+		return 0, ErrURLNotFound
+	}
+
+	return res, nil
 }
 
 // Exists checks if a URL code exists in Redis.
-// TODO: Implement the exists check:
+// DONE: Implement the exists check:
 // 1. Use EXISTS command on "url:{code}"
 // 2. Return true if exists, false otherwise
 func (r *URLRepository) Exists(ctx context.Context, code string) (bool, error) {
-	// TODO: Implement exists check
+	// DONE: Implement exists check
 	// key := fmt.Sprintf("url:%s", code)
 	// count, err := r.client.Exists(ctx, key).Result()
 	// if err != nil {
 	//     return false, fmt.Errorf("failed to check existence: %w", err)
 	// }
 	// return count > 0, nil
-
-	return false, fmt.Errorf("not implemented")
-}
-
-// parseTime parses a time string in RFC3339 format.
-// Returns nil if the string is empty.
-func parseTime(s string) (*time.Time, error) {
-	if s == "" {
-		return nil, nil
-	}
-	t, err := time.Parse(time.RFC3339, s)
+	key := fmt.Sprintf("url:%s", code)
+	c, err := r.client.Exists(ctx, key).Result()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse time: %w", err)
+		return false, fmt.Errorf("fail to implement Exists() due to: %w", err)
 	}
-	return &t, nil
-}
+	if c < 1 {
+		return false, nil
+	}
 
-// formatTime formats a time pointer to RFC3339 string.
-// Returns empty string if the pointer is nil.
-func formatTime(t *time.Time) string {
-	if t == nil {
-		return ""
-	}
-	return t.Format(time.RFC3339)
-}
-
-// calculateTTL calculates the TTL duration from an expiry time.
-// Returns 0 if expireAt is nil (no expiry).
-func calculateTTL(expireAt *time.Time) time.Duration {
-	if expireAt == nil {
-		return 0
-	}
-	ttl := time.Until(*expireAt)
-	if ttl < 0 {
-		return 0
-	}
-	return ttl
+	return true, nil
 }
 
 // Common errors
